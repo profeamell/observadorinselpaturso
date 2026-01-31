@@ -313,10 +313,10 @@ const App: React.FC = () => {
         {activeTab === 'incidents' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Novedades y Faltas</h3>
+              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Incidencias</h3>
               <button onClick={() => setShowIncidentForm(true)} className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold flex items-center space-x-2 text-[10px] uppercase tracking-widest shadow-lg shadow-red-100 active:scale-95 transition-all">
                 <Plus size={16} />
-                <span>Registrar Falta</span>
+                <span>Registrar Incidencia</span>
               </button>
             </div>
             

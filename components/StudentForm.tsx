@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  X, Camera, User, HeartPulse, History, Star, Save
+  X, Camera, User, HeartPulse, History, Star, Save, Lock
 } from 'lucide-react';
 import { Student, Course, AppState, UserRole } from '../types';
 import { DOCUMENT_TYPES, RH_FACTORS } from '../constants';
@@ -16,10 +16,17 @@ interface StudentFormProps {
 
 const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'personal' | 'medical' | 'history' | 'interests'>('personal');
+  
+  // Determinar si el usuario es docente y tiene un curso asignado
+  const isTeacher = currentUser?.role === 'TEACHER';
+  const assignedCourseId = currentUser?.courseId;
+  const isNewStudent = !student;
+
   const [formData, setFormData] = useState<Partial<Student>>(student || {
     documentId: '',
     documentType: 'TI',
-    courseId: courses[0]?.id || '',
+    // Si es docente y es nuevo estudiante, forzar su curso asignado
+    courseId: (isNewStudent && isTeacher && assignedCourseId) ? assignedCourseId : (courses[0]?.id || ''),
     firstName: '',
     lastName: '',
     birthDate: '',
@@ -44,6 +51,13 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
     directorId: currentUser?.id || '',
     lastUpdated: new Date().toISOString()
   });
+
+  // Efecto para asegurar que si el docente cambia su curso asignado (poco común durante la sesión), el form se actualice
+  useEffect(() => {
+    if (isNewStudent && isTeacher && assignedCourseId && formData.courseId !== assignedCourseId) {
+      setFormData(prev => ({ ...prev, courseId: assignedCourseId }));
+    }
+  }, [assignedCourseId, isTeacher, isNewStudent]);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,11 +88,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
 
   const canEdit = currentUser?.role === 'ADMIN' || (student?.directorId === currentUser?.id) || !student;
 
-  // Ordenar cursos por ID para facilitar la selección
-  const sortedCourses = [...courses].sort((a, b) => 
-    a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' })
-  );
-
   if (!canEdit) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -93,6 +102,10 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
       </div>
     );
   }
+
+  const sortedCourses = [...courses].sort((a, b) => 
+    a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -144,7 +157,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
                     <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                   </label>
                 </div>
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest text-center">Formato PNG/JPG. Máximo 2MB.</p>
               </div>
 
               <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -152,12 +164,31 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
                 <FormInput label="Apellidos" value={formData.lastName} onChange={v => setFormData({...formData, lastName: v})} />
                 <FormSelect label="Tipo Documento" options={DOCUMENT_TYPES} value={formData.documentType} onChange={v => setFormData({...formData, documentType: v})} />
                 <FormInput label="Nro Documento" value={formData.documentId} onChange={v => setFormData({...formData, documentId: v})} />
+                
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Curso</label>
-                  <select value={formData.courseId} onChange={e => setFormData({...formData, courseId: e.target.value})} className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm text-black focus:border-slate-900 transition-all shadow-sm">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Curso</label>
+                    {isTeacher && assignedCourseId && (
+                      <div className="flex items-center space-x-1 text-[9px] text-blue-600 font-black uppercase">
+                        <Lock size={10} />
+                        <span>Asignado</span>
+                      </div>
+                    )}
+                  </div>
+                  <select 
+                    disabled={isTeacher && !!assignedCourseId}
+                    value={formData.courseId} 
+                    onChange={e => setFormData({...formData, courseId: e.target.value})} 
+                    className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none font-bold text-sm shadow-sm transition-all ${
+                      isTeacher && assignedCourseId 
+                        ? 'bg-slate-50 text-slate-500 cursor-not-allowed border-blue-100' 
+                        : 'bg-white text-black focus:border-slate-900'
+                    }`}
+                  >
                     {sortedCourses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Fecha Nacimiento</label>
                   <input type="date" value={formData.birthDate} onChange={e => setFormData({...formData, birthDate: e.target.value})} className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm text-black focus:border-slate-900 transition-all shadow-sm" />
