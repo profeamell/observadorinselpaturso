@@ -1,3 +1,4 @@
+
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Student, Incident } from '../types';
@@ -172,4 +173,29 @@ export const generateDateRangeReportPDF = async (incidents: Incident[], startDat
   });
 
   doc.save(`Reporte_Novedades_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const generateCourseStudentsPDF = async (students: Student[], courseName: string) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(FULL_INSTITUTION_NAME, pageWidth / 2, 20, { align: 'center' });
+  doc.text(`LISTADO DE ESTUDIANTES - CURSO ${courseName}`, pageWidth / 2, 28, { align: 'center' });
+  
+  autoTable(doc, {
+    startY: 35,
+    head: [['#', 'Nombres', 'Apellidos']],
+    body: students.map((s, index) => [
+      index + 1,
+      s.firstName.toUpperCase(),
+      s.lastName.toUpperCase()
+    ]),
+    theme: 'striped',
+    headStyles: { fillColor: [30, 41, 59], fontSize: 10 },
+    styles: { fontSize: 9 }
+  });
+
+  doc.save(`Lista_Estudiantes_${courseName}_${new Date().toISOString().split('T')[0]}.pdf`);
 };

@@ -1,25 +1,30 @@
 
 import React, { useState } from 'react';
-import { FileDown, Calendar, Filter, Search, User, ChevronRight, FileText, Loader2 } from 'lucide-react';
-import { AppState, Incident, Student } from '../types';
-import { generateDateRangeReportPDF, generateStudentFilePDF } from '../services/pdfService';
+import { FileDown, Calendar, Filter, Search, User, ChevronRight, FileText, Loader2, ListChecks } from 'lucide-react';
+import { AppState, Incident, Student, Course } from '../types';
+import { generateDateRangeReportPDF, generateStudentFilePDF, generateCourseStudentsPDF } from '../services/pdfService';
 
 interface ReportsPanelProps {
   data: AppState;
 }
 
 const ReportsPanel: React.FC<ReportsPanelProps> = ({ data }) => {
-  const [activeTab, setActiveTab] = useState<'consolidated' | 'individual'>('consolidated');
+  const [activeTab, setActiveTab] = useState<'consolidated' | 'individual' | 'course_list'>('consolidated');
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
 
   const filteredIncidents = data.incidents.filter(incident => {
     const incidentDate = incident.date;
     return incidentDate >= startDate && incidentDate <= endDate;
   });
+
+  const studentsByCourse = data.students
+    .filter(s => s.courseId === selectedCourseId)
+    .sort((a, b) => a.lastName.localeCompare(b.lastName));
 
   const filteredStudents = data.students.filter(s => 
     `${s.firstName} ${s.lastName}`.toLowerCase().includes(studentSearch.toLowerCase()) ||
@@ -55,24 +60,43 @@ const ReportsPanel: React.FC<ReportsPanelProps> = ({ data }) => {
     }
   };
 
+  const handleGenerateCourseList = async () => {
+    if (!selectedCourseId) return;
+    setIsGenerating(true);
+    try {
+      const course = data.courses.find(c => c.id === selectedCourseId);
+      await generateCourseStudentsPDF(studentsByCourse, course?.name || selectedCourseId);
+    } catch (error) {
+      alert("Error al generar la lista por curso.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex space-x-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
+      <div className="flex space-x-2 bg-slate-100 p-1.5 rounded-2xl w-fit overflow-x-auto">
         <button 
           onClick={() => setActiveTab('consolidated')}
-          className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'consolidated' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'consolidated' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
           Reporte Consolidado
         </button>
         <button 
           onClick={() => setActiveTab('individual')}
-          className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'individual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'individual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
           Ficha Individual
         </button>
+        <button 
+          onClick={() => setActiveTab('course_list')}
+          className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'course_list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Lista por Curso
+        </button>
       </div>
 
-      {activeTab === 'consolidated' ? (
+      {activeTab === 'consolidated' && (
         <div className="space-y-6">
           <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
             <div className="flex flex-col md:flex-row md:items-end gap-6">
@@ -162,7 +186,9 @@ const ReportsPanel: React.FC<ReportsPanelProps> = ({ data }) => {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'individual' && (
         <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-200 max-w-2xl mx-auto text-center space-y-8">
            <div className="bg-blue-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto">
               <User className="text-blue-600" size={32} />
@@ -221,6 +247,86 @@ const ReportsPanel: React.FC<ReportsPanelProps> = ({ data }) => {
                 </button>
              </div>
            )}
+        </div>
+      )}
+
+      {activeTab === 'course_list' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
+          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
+            <div className="flex flex-col md:flex-row md:items-end gap-6">
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Seleccionar Curso</label>
+                <div className="relative">
+                  <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <select 
+                    className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm text-black focus:ring-2 focus:ring-slate-900/5 transition-all shadow-sm"
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value)}
+                  >
+                    <option value="">Elegir un curso...</option>
+                    {data.courses.map(course => (
+                      <option key={course.id} value={course.id}>{course.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button 
+                disabled={isGenerating || !selectedCourseId || studentsByCourse.length === 0}
+                onClick={handleGenerateCourseList}
+                className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-100 disabled:opacity-50 flex items-center justify-center space-x-3"
+              >
+                {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileDown size={18} />}
+                <span>Descargar Listado PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {selectedCourseId && (
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                    Listado del Curso {data.courses.find(c => c.id === selectedCourseId)?.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wider">
+                    {studentsByCourse.length} estudiantes inscritos
+                  </p>
+                </div>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-20">Item #</th>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombres</th>
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Apellidos</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {studentsByCourse.map((s, index) => (
+                      <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-5 text-sm font-black text-slate-400">{index + 1}</td>
+                        <td className="px-8 py-5">
+                          <p className="font-bold text-slate-900 text-sm uppercase">{s.firstName}</p>
+                        </td>
+                        <td className="px-8 py-5">
+                          <p className="font-bold text-slate-900 text-sm uppercase">{s.lastName}</p>
+                        </td>
+                      </tr>
+                    ))}
+                    {studentsByCourse.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-8 py-20 text-center text-slate-400 font-black uppercase text-xs tracking-widest opacity-30">
+                          No hay estudiantes en este curso
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

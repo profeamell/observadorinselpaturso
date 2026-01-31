@@ -89,10 +89,9 @@ const App: React.FC = () => {
 
   const saveStudent = async (student: Student) => {
     try {
-      // Auto-asignar directorId basado en el curso si existe una asignación centralizada
-      const assignment = data.groupAssignments.find(a => a.courseId === student.courseId);
-      if (assignment) {
-        student.directorId = assignment.teacherId;
+      const directorUser = data.users.find(u => u.courseId === student.courseId);
+      if (directorUser) {
+        student.directorId = directorUser.id;
       }
       
       const saved = await dbService.saveStudent(student);
@@ -115,7 +114,19 @@ const App: React.FC = () => {
   };
 
   const deleteStudent = async (id: string) => {
-    if (!confirm('¿Borrar definitivamente?')) return;
+    const student = data.students.find(s => s.id === id);
+    if (!student) return;
+
+    // Lógica de autorización
+    const isAdmin = data.currentUser?.role === 'ADMIN';
+    const isDirector = data.currentUser?.role === 'TEACHER' && data.currentUser?.courseId === student.courseId;
+
+    if (!isAdmin && !isDirector) {
+      alert("No está autorizado para eliminar este estudiante. Solo el administrador o el director de grupo asignado tienen este permiso.");
+      return;
+    }
+
+    if (!confirm('¿Borrar definitivamente este estudiante y todo su historial?')) return;
     try {
       await dbService.deleteStudent(id);
       setData(prev => ({ ...prev, students: prev.students.filter(s => s.id !== id) }));
@@ -123,8 +134,24 @@ const App: React.FC = () => {
   };
 
   const deleteIncident = async (id: string) => {
+    const incident = data.incidents.find(i => i.id === id);
+    if (!incident) return;
+
+    const student = data.students.find(s => s.id === incident.studentId);
+    
+    // Lógica de autorización
+    const isAdmin = data.currentUser?.role === 'ADMIN';
+    // Si el estudiante no existe (huérfano), solo el admin puede borrar
+    const isDirector = student && data.currentUser?.role === 'TEACHER' && data.currentUser?.courseId === student.courseId;
+
+    if (!isAdmin && !isDirector) {
+      alert("No está autorizado para eliminar esta incidencia. Solo el administrador o el director de grupo asignado tienen este permiso.");
+      return;
+    }
+
     if (!confirm('¿Borrar definitivamente este registro de incidencia?')) return;
     try {
+      await dbService.deleteIncident(id);
       setData(prev => ({ ...prev, incidents: prev.incidents.filter(i => i.id !== id) }));
     } catch (err) { alert("Error al eliminar incidencia."); }
   };
@@ -272,9 +299,9 @@ const App: React.FC = () => {
                         <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black">{getCourseName(student.courseId)}</span>
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
-                        <button onClick={() => { setViewingStudent(student); setShowStudentView(true); }} className="p-2 text-slate-400 hover:text-blue-600"><Eye size={18} /></button>
-                        <button onClick={() => { setEditingStudent(student); setShowStudentForm(true); }} className="p-2 text-slate-400 hover:text-amber-600"><Edit size={18} /></button>
-                        <button onClick={() => deleteStudent(student.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 size={18} /></button>
+                        <button onClick={() => { setViewingStudent(student); setShowStudentView(true); }} className="p-2 text-slate-400 hover:text-blue-600" title="Ver ficha integral"><Eye size={18} /></button>
+                        <button onClick={() => { setEditingStudent(student); setShowStudentForm(true); }} className="p-2 text-slate-400 hover:text-amber-600" title="Editar datos"><Edit size={18} /></button>
+                        <button onClick={() => deleteStudent(student.id)} className="p-2 text-slate-400 hover:text-red-600" title="Eliminar registro"><Trash2 size={18} /></button>
                       </td>
                     </tr>
                   ))}

@@ -7,6 +7,7 @@ export interface User {
   password?: string;
   role: UserRole;
   name: string;
+  courseId?: string; // Nuevo campo opcional
 }
 
 export interface Teacher {

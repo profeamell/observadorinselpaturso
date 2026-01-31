@@ -84,11 +84,10 @@ class DbService {
     try {
       await client.execute("PRAGMA foreign_keys = ON;");
       await client.batch([
-        `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT, name TEXT)`,
+        `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT, name TEXT, course_id TEXT)`,
         `CREATE TABLE IF NOT EXISTS teachers (id TEXT PRIMARY KEY, name TEXT, document_id TEXT UNIQUE)`,
         `CREATE TABLE IF NOT EXISTS courses (id TEXT PRIMARY KEY, name TEXT UNIQUE)`,
         `CREATE TABLE IF NOT EXISTS fault_types (id TEXT PRIMARY KEY, type TEXT)`,
-        `CREATE TABLE IF NOT EXISTS group_directors (course_id TEXT PRIMARY KEY, teacher_id TEXT, FOREIGN KEY(course_id) REFERENCES courses(id), FOREIGN KEY(teacher_id) REFERENCES teachers(id))`,
         `CREATE TABLE IF NOT EXISTS students (
           id TEXT PRIMARY KEY, document_id TEXT UNIQUE, document_type TEXT, course_id TEXT, 
           photo_base64 TEXT, first_name TEXT, last_name TEXT, birth_date TEXT, 
@@ -103,7 +102,7 @@ class DbService {
           id TEXT PRIMARY KEY, student_id TEXT, student_name TEXT, course_name TEXT, 
           type TEXT, fault_type_id TEXT, date TEXT, follow_up INTEGER, period TEXT, 
           observation TEXT, evidence_base64 TEXT, registered_by_teacher_id TEXT, 
-          registered_by_teacher_name TEXT
+          registered_by_teacher_name TEXT, FOREIGN KEY(student_id) REFERENCES students(id)
         )`
       ], "write");
 
@@ -123,13 +122,12 @@ class DbService {
     const client = await this.getClient();
     try {
       const results = await client.batch([
-        "SELECT id, username, role, name FROM users",
+        "SELECT id, username, role, name, course_id as courseId FROM users",
         "SELECT * FROM teachers",
         "SELECT * FROM courses",
         "SELECT * FROM fault_types",
         "SELECT * FROM students ORDER BY last_updated DESC LIMIT 200",
-        "SELECT * FROM incidents ORDER BY date DESC LIMIT 200",
-        "SELECT gd.course_id as courseId, gd.teacher_id as teacherId, t.name as teacherName, c.name as courseName FROM group_directors gd JOIN teachers t ON gd.teacher_id = t.id JOIN courses c ON gd.course_id = c.id"
+        "SELECT * FROM incidents ORDER BY date DESC LIMIT 200"
       ], "read");
 
       return { 
@@ -139,7 +137,7 @@ class DbService {
         faultTypes: (results[3].rows as unknown) as FaultType[], 
         students: results[4].rows.map(this.mapStudent), 
         incidents: results[5].rows.map(this.mapIncident),
-        groupAssignments: (results[6].rows as unknown) as GroupAssignment[]
+        groupAssignments: [] 
       };
     } catch (e: any) {
       console.error("Turso Fetch Error:", e.message);
@@ -147,38 +145,43 @@ class DbService {
     }
   }
 
-  // --- ENTITY MANAGEMENT ---
-
-  async saveGroupAssignment(courseId: string, teacherId: string) {
-    const client = await this.getClient();
-    await client.execute({
-      sql: `INSERT INTO group_directors (course_id, teacher_id) VALUES (?, ?) 
-            ON CONFLICT(course_id) DO UPDATE SET teacher_id=excluded.teacher_id`,
-      args: [courseId, teacherId]
-    });
-  }
-
-  async deleteGroupAssignment(courseId: string) {
-    const client = await this.getClient();
-    await client.execute({ sql: `DELETE FROM group_directors WHERE course_id = ?`, args: [courseId] });
-  }
-
   async saveUser(u: User) {
     const client = await this.getClient();
-    await client.execute({
-      sql: `INSERT INTO users (id, username, password, role, name) VALUES (?, ?, ?, ?, ?) 
-            ON CONFLICT(id) DO UPDATE SET 
-              username=excluded.username, 
-              role=excluded.role, 
-              name=excluded.name,
-              password=excluded.password`,
-      args: [u.id, u.username, u.password || '123', u.role, u.name]
-    });
+    if (u.id && !u.password) {
+      await client.execute({
+        sql: `UPDATE users SET username=?, role=?, name=?, course_id=? WHERE id=?`,
+        args: [u.username, u.role, u.name, u.courseId || null, u.id]
+      });
+    } else {
+      await client.execute({
+        sql: `INSERT INTO users (id, username, password, role, name, course_id) VALUES (?, ?, ?, ?, ?, ?) 
+              ON CONFLICT(id) DO UPDATE SET 
+                username=excluded.username, 
+                role=excluded.role, 
+                name=excluded.name,
+                password=CASE WHEN excluded.password IS NOT NULL THEN excluded.password ELSE users.password END,
+                course_id=excluded.course_id`,
+        args: [u.id, u.username, u.password || '123', u.role, u.name, u.courseId || null]
+      });
+    }
   }
 
   async deleteUser(id: string) {
     const client = await this.getClient();
     await client.execute({ sql: `DELETE FROM users WHERE id = ?`, args: [id] });
+  }
+
+  async deleteStudent(id: string) {
+    const client = await this.getClient();
+    await client.batch([
+      { sql: `DELETE FROM incidents WHERE student_id = ?`, args: [id] },
+      { sql: `DELETE FROM students WHERE id = ?`, args: [id] }
+    ], "write");
+  }
+
+  async deleteIncident(id: string) {
+    const client = await this.getClient();
+    await client.execute({ sql: `DELETE FROM incidents WHERE id = ?`, args: [id] });
   }
 
   async saveTeacher(t: Teacher) {
@@ -246,18 +249,12 @@ class DbService {
         s.id, s.documentId, s.documentType, s.courseId, s.photoBase64 || '', s.firstName, s.lastName,
         s.birthDate, s.studentPhone, s.studentAddress, s.guardianName, s.guardianPhone,
         s.guardianRelationship, s.siblingCount, s.eps, s.rhFactor, s.medicalConditions,
-        // Fix: changed s.previous_school to s.previousSchool
         s.medicalFormulation, s.failedYears, s.previousSchool, s.transferReason,
         s.historyObservations, s.favoriteSubjects, s.difficultSubjects,
         s.freeTimeActivities, s.lifeProject, s.directorId
       ]
     });
     return s;
-  }
-
-  async deleteStudent(id: string) {
-    const client = await this.getClient();
-    await client.execute({ sql: `DELETE FROM students WHERE id = ?`, args: [id] });
   }
 
   async saveIncident(i: Incident) {
@@ -286,7 +283,7 @@ class DbService {
   async login(username: string, password: string): Promise<User | null> {
     const client = await this.getClient();
     const result = await client.execute({
-      sql: `SELECT id, username, role, name, password FROM users WHERE username = ?`,
+      sql: `SELECT id, username, role, name, password, course_id as courseId FROM users WHERE username = ?`,
       args: [username]
     });
     
