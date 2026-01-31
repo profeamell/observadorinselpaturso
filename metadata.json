@@ -1,0 +1,7 @@
+{
+  "name": "Observador INSELPISTA",
+  "description": "Sistema de registro, gestión y visualización del Observador del Estudiante para la institución INSELPISTA.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

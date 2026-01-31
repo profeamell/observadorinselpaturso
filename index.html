@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INSELPA | Observador Digital</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+          font-family: 'Plus Jakarta Sans', sans-serif; 
+          margin: 0;
+          background-color: #f8fafc;
+          overflow-x: hidden;
+        }
+        #root:empty {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+        }
+        #root:empty::after {
+          content: "INSELPA - Conectando a Turso...";
+          font-weight: 800;
+          color: #2563eb;
+          font-size: 14px;
+          margin-top: 15px;
+          animation: pulse 1.5s infinite;
+        }
+        #root:empty::before {
+          content: "";
+          width: 32px;
+          height: 32px;
+          border: 4px solid #f3f4f6;
+          border-top-color: #2563eb;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.463.0?external=react",
+    "recharts": "https://esm.sh/recharts@2.15.0?external=react",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2",
+    "@libsql/client/web": "https://esm.sh/@libsql/client@0.14.0/web",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@sqlitecloud/drivers": "https://esm.sh/@sqlitecloud/drivers@^1.0.739",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@libsql/client/": "https://esm.sh/@libsql/client@^0.17.0/"
+  }
+}
+</script>
+</head>
+<body class="antialiased">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>
