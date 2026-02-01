@@ -1,24 +1,24 @@
 
 import React, { useState } from 'react';
 import { X, Camera, Save, ClipboardList, BookOpen, Search, UserCircle } from 'lucide-react';
-import { Incident, Student, FaultType, AppState, IncidentType, User } from '../types';
+import { Incident, Student, FaultType, AppState, IncidentType, User, Course } from '../types';
 import { PERIODS } from '../constants';
 
 interface IncidentFormProps {
   students: Student[];
   faultTypes: FaultType[];
-  users: User[]; // Cambiado de Teacher[] a User[]
+  users: User[];
+  courses: Course[]; // Añadido para resolver nombres de curso
   onSave: (incident: Incident) => void;
   onClose: () => void;
   currentUser: AppState['currentUser'];
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users, onSave, onClose, currentUser }) => {
+const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users, courses, onSave, onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<IncidentType>('Disciplinaria');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
-  // Predeterminar los datos del docente responsable con el usuario logueado
   const [formData, setFormData] = useState<Partial<Incident>>({
     date: new Date().toISOString().split('T')[0],
     period: '1',
@@ -26,7 +26,7 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
     observation: '',
     registeredByTeacherId: currentUser?.id || '',
     registeredByTeacherName: currentUser?.name || '',
-    faultTypeId: faultTypes[0]?.id || ''
+    faultTypeId: activeTab === 'Disciplinaria' ? (faultTypes[0]?.id || '') : undefined
   });
 
   const filteredStudents = students.filter(s => 
@@ -64,13 +64,18 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
       return;
     }
 
+    // Resolver el nombre del curso real
+    const studentCourse = courses.find(c => c.id === selectedStudent.courseId);
+    const courseName = studentCourse ? studentCourse.name : selectedStudent.courseId;
+
     onSave({
       ...formData as Incident,
       id: Math.random().toString(36).substr(2, 9),
       type: activeTab,
       studentId: selectedStudent.id,
       studentName: `${selectedStudent.firstName} ${selectedStudent.lastName}`,
-      courseName: students.find(s => s.id === selectedStudent.id)?.courseId || selectedStudent.courseId
+      courseName: courseName,
+      faultTypeId: activeTab === 'Disciplinaria' ? formData.faultTypeId : undefined
     });
   };
 
@@ -85,7 +90,10 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
 
         <div className="flex border-b border-slate-100">
           <button
-            onClick={() => setActiveTab('Disciplinaria')}
+            onClick={() => {
+              setActiveTab('Disciplinaria');
+              setFormData(prev => ({ ...prev, faultTypeId: faultTypes[0]?.id }));
+            }}
             className={`flex-1 flex items-center justify-center space-x-2 py-4 border-b-2 transition-all font-bold ${
               activeTab === 'Disciplinaria' ? 'border-red-600 text-red-600 bg-red-50/30' : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
@@ -94,7 +102,10 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
             <span className="uppercase text-xs tracking-widest">Disciplinaria</span>
           </button>
           <button
-            onClick={() => setActiveTab('Académica')}
+            onClick={() => {
+              setActiveTab('Académica');
+              setFormData(prev => ({ ...prev, faultTypeId: undefined }));
+            }}
             className={`flex-1 flex items-center justify-center space-x-2 py-4 border-b-2 transition-all font-bold ${
               activeTab === 'Académica' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/30' : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
@@ -120,20 +131,23 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
                 />
               </div>
               <div className="mt-2 border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-48 overflow-y-auto bg-white shadow-lg">
-                {filteredStudents.map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelectedStudent(s)}
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{s.firstName} {s.lastName}</p>
-                      <p className="text-xs text-slate-500">{s.documentId}</p>
-                    </div>
-                    <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100">CURSO: {s.courseId}</span>
-                  </button>
-                ))}
+                {filteredStudents.map(s => {
+                  const cName = courses.find(c => c.id === s.courseId)?.name || s.courseId;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedStudent(s)}
+                      className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{s.firstName} {s.lastName}</p>
+                        <p className="text-xs text-slate-500">{s.documentId}</p>
+                      </div>
+                      <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100">CURSO: {cName}</span>
+                    </button>
+                  );
+                })}
                 {filteredStudents.length === 0 && (
                   <p className="p-4 text-center text-xs text-slate-400 font-medium">No se encontraron resultados</p>
                 )}
@@ -145,7 +159,7 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
               <div className="z-10">
                 <p className="text-[10px] text-blue-100 font-bold uppercase tracking-widest opacity-80 mb-1">Estudiante Seleccionado</p>
                 <p className="font-bold text-xl leading-tight">{selectedStudent.firstName} {selectedStudent.lastName}</p>
-                <p className="text-xs text-blue-100 font-medium mt-1">ID: {selectedStudent.documentId} | Curso: {selectedStudent.courseId}</p>
+                <p className="text-xs text-blue-100 font-medium mt-1">ID: {selectedStudent.documentId} | Curso: {courses.find(c => c.id === selectedStudent.courseId)?.name || selectedStudent.courseId}</p>
               </div>
               <button 
                 type="button" 
@@ -176,7 +190,6 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users
                   ))}
                 </select>
               </div>
-              <p className="text-[9px] text-slate-400 font-bold mt-1 px-1 uppercase tracking-tight">* Seleccionado por defecto el docente logueado actualmente.</p>
             </div>
 
             {activeTab === 'Disciplinaria' && (

@@ -68,7 +68,7 @@ class DbService {
       studentName: String(i.student_name || 'Estudiante desconocido'),
       courseName: String(i.course_name || ''),
       type: (i.type || 'Disciplinaria') as any,
-      faultTypeId: String(i.fault_type_id || ''),
+      faultTypeId: i.fault_type_id || undefined,
       date: String(i.date || new Date().toISOString().split('T')[0]),
       follow_up: Boolean(i.follow_up),
       period: (i.period || '1') as any,
@@ -181,7 +181,18 @@ class DbService {
 
   async deleteIncident(id: string) {
     const client = await this.getClient();
-    await client.execute({ sql: `DELETE FROM incidents WHERE id = ?`, args: [id] });
+    // Aseguramos que el cliente esté activo antes de ejecutar
+    if (!id) throw new Error("ID de incidencia no proporcionado.");
+    try {
+      await client.execute({ 
+        sql: `DELETE FROM incidents WHERE id = ?`, 
+        args: [id] 
+      });
+      return true;
+    } catch (e: any) {
+      console.error("Error al borrar incidencia en Turso:", e);
+      throw new Error(`Error de base de datos al eliminar: ${e.message}`);
+    }
   }
 
   async saveTeacher(t: Teacher) {
@@ -240,13 +251,32 @@ class DbService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET 
         document_id=excluded.document_id, 
+        document_type=excluded.document_type,
         first_name=excluded.first_name, 
         last_name=excluded.last_name, 
         course_id=excluded.course_id,
         photo_base64=excluded.photo_base64,
+        student_phone=excluded.student_phone,
+        student_address=excluded.student_address,
+        guardian_name=excluded.guardian_name,
+        guardian_phone=excluded.guardian_phone,
+        guardian_relationship=excluded.guardian_relationship,
+        sibling_count=excluded.sibling_count,
+        eps=excluded.eps,
+        rh_factor=excluded.rh_factor,
+        medical_conditions=excluded.medical_conditions,
+        medical_formulation=excluded.medical_formulation,
+        failed_years=excluded.failed_years,
+        previous_school=excluded.previous_school,
+        transfer_reason=excluded.transfer_reason,
+        history_observations=excluded.history_observations,
+        favorite_subjects=excluded.favorite_subjects,
+        difficult_subjects=excluded.difficult_subjects,
+        free_time_activities=excluded.free_time_activities,
+        life_project=excluded.life_project,
         last_updated=CURRENT_TIMESTAMP`,
       args: [
-        s.id, s.documentId, s.documentType, s.courseId, s.photoBase64 || '', s.firstName, s.lastName,
+        s.id, s.documentId, s.documentType, s.courseId, s.photoBase64 || null, s.firstName, s.lastName,
         s.birthDate, s.studentPhone, s.studentAddress, s.guardianName, s.guardianPhone,
         s.guardianRelationship, s.siblingCount, s.eps, s.rhFactor, s.medicalConditions,
         s.medicalFormulation, s.failedYears, s.previousSchool, s.transferReason,
@@ -267,9 +297,19 @@ class DbService {
         registered_by_teacher_id, registered_by_teacher_name
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        i.id, i.studentId, i.studentName, i.courseName, i.type, i.faultTypeId || '',
-        i.date, i.follow_up ? 1 : 0, i.period, i.observation, i.evidenceBase64 || '',
-        i.registeredByTeacherId, i.registeredByTeacherName
+        i.id, 
+        i.studentId, 
+        i.studentName, 
+        i.courseName, 
+        i.type, 
+        i.faultTypeId || null,
+        i.date, 
+        i.follow_up ? 1 : 0, 
+        i.period, 
+        i.observation, 
+        i.evidenceBase64 || null,
+        i.registeredByTeacherId, 
+        i.registeredByTeacherName
       ]
     });
     return i;

@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import StudentForm from './components/StudentForm';
 import StudentView from './components/StudentView';
 import IncidentForm from './components/IncidentForm';
+import IncidentView from './components/IncidentView'; 
 import AdminPanel from './components/AdminPanel';
 import ReportsPanel from './components/ReportsPanel';
 import { 
@@ -23,9 +24,11 @@ const App: React.FC = () => {
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [showStudentView, setShowStudentView] = useState(false);
   const [showIncidentForm, setShowIncidentForm] = useState(false);
+  const [showIncidentView, setShowIncidentView] = useState(false); 
   
   const [editingStudent, setEditingStudent] = useState<Student | undefined>();
   const [viewingStudent, setViewingStudent] = useState<Student | undefined>();
+  const [viewingIncident, setViewingIncident] = useState<Incident | undefined>(); 
   
   const [studentSearch, setStudentSearch] = useState('');
   const [incidentSearch, setIncidentSearch] = useState('');
@@ -101,28 +104,33 @@ const App: React.FC = () => {
           ? prev.students.map(s => s.id === saved.id ? saved : s)
           : [saved, ...prev.students]
       }));
-    } catch (err) { alert("Error al guardar."); }
-    setShowStudentForm(false);
+      setShowStudentForm(false);
+    } catch (err: any) { 
+      console.error("Error al guardar estudiante:", err);
+      alert("Error al guardar: " + (err.message || "Fallo de conexión")); 
+    }
   };
 
   const saveIncident = async (incident: Incident) => {
     try {
       const saved = await dbService.saveIncident(incident);
       setData(prev => ({ ...prev, incidents: [saved, ...prev.incidents] }));
-    } catch (err) { alert("Error al registrar."); }
-    setShowIncidentForm(false);
+      setShowIncidentForm(false);
+    } catch (err: any) { 
+      console.error("Error al registrar incidencia:", err);
+      alert("Error al registrar: " + (err.message || "Fallo en la base de datos. Verifique si el estudiante existe.")); 
+    }
   };
 
   const deleteStudent = async (id: string) => {
     const student = data.students.find(s => s.id === id);
     if (!student) return;
 
-    // Lógica de autorización
     const isAdmin = data.currentUser?.role === 'ADMIN';
     const isDirector = data.currentUser?.role === 'TEACHER' && data.currentUser?.courseId === student.courseId;
 
     if (!isAdmin && !isDirector) {
-      alert("No está autorizado para eliminar este estudiante. Solo el administrador o el director de grupo asignado tienen este permiso.");
+      alert("No está autorizado para eliminar este estudiante.");
       return;
     }
 
@@ -139,28 +147,38 @@ const App: React.FC = () => {
 
     const student = data.students.find(s => s.id === incident.studentId);
     
-    // Lógica de autorización
     const isAdmin = data.currentUser?.role === 'ADMIN';
-    // Si el estudiante no existe (huérfano), solo el admin puede borrar
+    const isOwner = data.currentUser?.id === incident.registeredByTeacherId;
     const isDirector = student && data.currentUser?.role === 'TEACHER' && data.currentUser?.courseId === student.courseId;
 
-    if (!isAdmin && !isDirector) {
-      alert("No está autorizado para eliminar esta incidencia. Solo el administrador o el director de grupo asignado tienen este permiso.");
+    // Ahora se permite borrar si eres Admin, el Director del estudiante o si tú mismo creaste el reporte
+    if (!isAdmin && !isDirector && !isOwner) {
+      alert("No está autorizado para eliminar esta incidencia. Solo el administrador, el director de grupo o el docente que realizó el registro pueden hacerlo.");
       return;
     }
 
     if (!confirm('¿Borrar definitivamente este registro de incidencia?')) return;
+    
     try {
+      setLoading(true);
       await dbService.deleteIncident(id);
-      setData(prev => ({ ...prev, incidents: prev.incidents.filter(i => i.id !== id) }));
-    } catch (err) { alert("Error al eliminar incidencia."); }
+      setData(prev => ({ 
+        ...prev, 
+        incidents: prev.incidents.filter(i => i.id !== id) 
+      }));
+    } catch (err: any) { 
+      console.error("Error al eliminar incidencia:", err);
+      alert("Error al eliminar en la nube: " + (err.message || "Fallo de red")); 
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-white">
         <Loader2 className="animate-spin text-slate-900 mb-4" size={40} />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Iniciando INSELPA...</p>
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Procesando en INSELPA...</p>
       </div>
     );
   }
@@ -357,12 +375,9 @@ const App: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button onClick={() => {
-                          const student = data.students.find(s => s.id === incident.studentId);
-                          if (student) {
-                            setViewingStudent(student);
-                            setShowStudentView(true);
-                          }
-                        }} className="p-2 text-slate-400 hover:text-blue-600" title="Ver ficha del estudiante"><Eye size={18} /></button>
+                          setViewingIncident(incident);
+                          setShowIncidentView(true);
+                        }} className="p-2 text-slate-400 hover:text-blue-600" title="Ver detalle de incidencia"><Eye size={18} /></button>
                         <button onClick={() => deleteIncident(incident.id)} className="p-2 text-slate-400 hover:text-red-600" title="Eliminar registro"><Trash2 size={18} /></button>
                       </td>
                     </tr>
@@ -391,8 +406,9 @@ const App: React.FC = () => {
       </main>
 
       {showStudentView && viewingStudent && <StudentView student={viewingStudent} courseName={getCourseName(viewingStudent.courseId)} onClose={() => setShowStudentView(false)} />}
+      {showIncidentView && viewingIncident && <IncidentView incident={viewingIncident} faultTypes={data.faultTypes} onClose={() => setShowIncidentView(false)} />}
       {showStudentForm && <StudentForm student={editingStudent} courses={data.courses} currentUser={data.currentUser} onSave={saveStudent} onClose={() => setShowStudentForm(false)} />}
-      {showIncidentForm && <IncidentForm students={data.students} faultTypes={data.faultTypes} users={data.users} currentUser={data.currentUser} onSave={saveIncident} onClose={() => setShowIncidentForm(false)} />}
+      {showIncidentForm && <IncidentForm students={data.students} faultTypes={data.faultTypes} users={data.users} courses={data.courses} currentUser={data.currentUser} onSave={saveIncident} onClose={() => setShowIncidentForm(false)} />}
     </div>
   );
 };
