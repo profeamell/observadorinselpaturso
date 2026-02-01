@@ -1,30 +1,31 @@
 
 import React, { useState } from 'react';
 import { X, Camera, Save, ClipboardList, BookOpen, Search, UserCircle } from 'lucide-react';
-import { Incident, Student, FaultType, AppState, IncidentType, Teacher } from '../types';
+import { Incident, Student, FaultType, AppState, IncidentType, User } from '../types';
 import { PERIODS } from '../constants';
 
 interface IncidentFormProps {
   students: Student[];
   faultTypes: FaultType[];
-  teachers: Teacher[]; // Cambiado de User[] a Teacher[]
+  users: User[]; // Cambiado de Teacher[] a User[]
   onSave: (incident: Incident) => void;
   onClose: () => void;
   currentUser: AppState['currentUser'];
 }
 
-const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, teachers, onSave, onClose, currentUser }) => {
+const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, users, onSave, onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<IncidentType>('Disciplinaria');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
+  // Predeterminar los datos del docente responsable con el usuario logueado
   const [formData, setFormData] = useState<Partial<Incident>>({
     date: new Date().toISOString().split('T')[0],
     period: '1',
     follow_up: false,
     observation: '',
-    registeredByTeacherId: teachers[0]?.id || '',
-    registeredByTeacherName: teachers[0]?.name || '',
+    registeredByTeacherId: currentUser?.id || '',
+    registeredByTeacherName: currentUser?.name || '',
     faultTypeId: faultTypes[0]?.id || ''
   });
 
@@ -45,13 +46,13 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, teach
   };
 
   const handleTeacherChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const teacherId = e.target.value;
-    const teacher = teachers.find(t => t.id === teacherId);
-    if (teacher) {
+    const userId = e.target.value;
+    const user = users.find(u => u.id === userId);
+    if (user) {
       setFormData({
         ...formData,
-        registeredByTeacherId: teacher.id,
-        registeredByTeacherName: teacher.name
+        registeredByTeacherId: user.id,
+        registeredByTeacherName: user.name
       });
     }
   };
@@ -69,7 +70,7 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, teach
       type: activeTab,
       studentId: selectedStudent.id,
       studentName: `${selectedStudent.firstName} ${selectedStudent.lastName}`,
-      courseName: selectedStudent.courseId
+      courseName: students.find(s => s.id === selectedStudent.id)?.courseId || selectedStudent.courseId
     });
   };
 
@@ -168,9 +169,14 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, teach
                   onChange={handleTeacherChange}
                 >
                   <option value="">Seleccione el docente...</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.id === currentUser?.id ? '(Tú)' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
+              <p className="text-[9px] text-slate-400 font-bold mt-1 px-1 uppercase tracking-tight">* Seleccionado por defecto el docente logueado actualmente.</p>
             </div>
 
             {activeTab === 'Disciplinaria' && (
@@ -226,7 +232,7 @@ const IncidentForm: React.FC<IncidentFormProps> = ({ students, faultTypes, teach
           <button onClick={onClose} type="button" className="px-6 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-all uppercase text-xs tracking-widest">Cancelar</button>
           <button onClick={handleSubmit} type="button" className={`px-8 py-2.5 text-white rounded-xl font-bold flex items-center justify-center space-x-2 transition-all shadow-lg uppercase text-xs tracking-widest active:scale-95 ${activeTab === 'Disciplinaria' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
             <Save size={18} />
-            <span>Guardar</span>
+            <span>Guardar Incidencia</span>
           </button>
         </div>
       </div>

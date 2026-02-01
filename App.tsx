@@ -392,7 +392,7 @@ const App: React.FC = () => {
 
       {showStudentView && viewingStudent && <StudentView student={viewingStudent} courseName={getCourseName(viewingStudent.courseId)} onClose={() => setShowStudentView(false)} />}
       {showStudentForm && <StudentForm student={editingStudent} courses={data.courses} currentUser={data.currentUser} onSave={saveStudent} onClose={() => setShowStudentForm(false)} />}
-      {showIncidentForm && <IncidentForm students={data.students} faultTypes={data.faultTypes} teachers={data.teachers} currentUser={data.currentUser} onSave={saveIncident} onClose={() => setShowIncidentForm(false)} />}
+      {showIncidentForm && <IncidentForm students={data.students} faultTypes={data.faultTypes} users={data.users} currentUser={data.currentUser} onSave={saveIncident} onClose={() => setShowIncidentForm(false)} />}
     </div>
   );
 };
