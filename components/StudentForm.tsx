@@ -17,7 +17,6 @@ interface StudentFormProps {
 const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'personal' | 'medical' | 'history' | 'interests'>('personal');
   
-  // Determinar si el usuario es docente y tiene un curso asignado
   const isTeacher = currentUser?.role === 'TEACHER';
   const assignedCourseId = currentUser?.courseId;
   const isNewStudent = !student;
@@ -25,7 +24,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
   const [formData, setFormData] = useState<Partial<Student>>(student || {
     documentId: '',
     documentType: 'TI',
-    // Si es docente y es nuevo estudiante, forzar su curso asignado
     courseId: (isNewStudent && isTeacher && assignedCourseId) ? assignedCourseId : (courses[0]?.id || ''),
     firstName: '',
     lastName: '',
@@ -37,7 +35,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
     guardianRelationship: '',
     siblingCount: 0,
     eps: '',
-    rhFactor: 'O+',
+    rhFactor: 'Sin info',
     medicalConditions: '',
     medicalFormulation: '',
     failedYears: '',
@@ -52,7 +50,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ student, courses, onSave, onC
     lastUpdated: new Date().toISOString()
   });
 
-  // Efecto para asegurar que si el docente cambia su curso asignado (poco común durante la sesión), el form se actualice
   useEffect(() => {
     if (isNewStudent && isTeacher && assignedCourseId && formData.courseId !== assignedCourseId) {
       setFormData(prev => ({ ...prev, courseId: assignedCourseId }));

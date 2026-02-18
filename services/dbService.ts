@@ -45,7 +45,7 @@ class DbService {
       siblingCount: Number(s.sibling_count) || 0,
       lastUpdated: String(s.last_updated || new Date().toISOString()),
       eps: String(s.eps || ''),
-      rhFactor: String(s.rh_factor || 'O+'),
+      rhFactor: String(s.rh_factor || 'Sin info'),
       medicalConditions: String(s.medical_conditions || ''),
       medicalFormulation: String(s.medical_formulation || ''),
       failedYears: String(s.failed_years || ''),
@@ -181,17 +181,16 @@ class DbService {
 
   async deleteIncident(id: string) {
     const client = await this.getClient();
-    // Aseguramos que el cliente esté activo antes de ejecutar
-    if (!id) throw new Error("ID de incidencia no proporcionado.");
+    if (!id) throw new Error("ID inválido");
     try {
       await client.execute({ 
-        sql: `DELETE FROM incidents WHERE id = ?`, 
+        sql: "DELETE FROM incidents WHERE id = ?", 
         args: [id] 
       });
       return true;
     } catch (e: any) {
-      console.error("Error al borrar incidencia en Turso:", e);
-      throw new Error(`Error de base de datos al eliminar: ${e.message}`);
+      console.error("Critical DB Delete Error:", e);
+      throw new Error(`Fallo de persistencia al eliminar: ${e.message}`);
     }
   }
 
